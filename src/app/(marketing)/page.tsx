@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, Brain, Clock } from 'lucide-react'
+import { BookOpen, Brain, Clock, MessageCircle } from 'lucide-react'
 import { HeroSection } from '@/components/sections/HeroSection'
 import { FeaturesGrid } from '@/components/sections/FeatureGrid'
 import { useSession } from 'next-auth/react'
@@ -32,6 +32,11 @@ export default function Page() {
       description: "Access the best learning materials curated by our AI."
     },
     {
+      icon: <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-[#7fb236]" />,
+      title: "24/7 Emotional Support Chatbot",
+      description: "Get multilingual, AI-powered emotional support any time you need it."
+    },
+    {
       icon: <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-[#7fb236]" />,
       title: "Time Management",
       description: "Manage your time effectively and stay on top of your studies."
@@ -43,7 +48,7 @@ export default function Page() {
       <HeroSection
         title="Welcome to"
         highlightedText="MindAlly"
-        description="Your AI-powered study assistant for accelerated learning"
+        description="Your AI-powered Mental Health and Career Companion"
         ctaText={session ? "Go to Dashboard" : "Get Started"}
         ctaLink={session ? "/home" : "/register"}
       />
