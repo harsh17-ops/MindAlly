@@ -25,13 +25,6 @@ export default function PdfListPage() {
   const { toast } = useToast();
   const { status } = useSession();
 
-  // Load documents on mount and when auth status changes
-  useEffect(() => {
-    if (status === 'authenticated') {
-      fetchDocuments();
-    }
-  }, [fetchDocuments]);
-
   const fetchDocuments = async () => {
     try {
       // Don't fetch if not authenticated
@@ -71,6 +64,11 @@ export default function PdfListPage() {
       setIsLoading(false);
     }
   };
+
+  // Load documents on mount and when auth status changes
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

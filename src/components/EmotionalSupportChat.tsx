@@ -54,35 +54,34 @@ export default function EmotionalSupportChat() {
     inputRef.current?.focus();
   }, []);
 
-  const loadLanguages = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/emotional-support/languages`);
-      if (response.ok) {
-        const { languages } = await response.json();
-        setLanguages(languages);
-      }
-    } catch (error) {
-      console.error('Failed to load languages:', error);
-    }
-  };
-
-  const loadMeditationVideos = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/emotional-support/meditation-videos`);
-      if (response.ok) {
-        const data = await response.json();
-        // setMeditationVideos(data.videos);
-      }
-    } catch (error) {
-      console.error('Failed to load meditation videos:', error);
-    }
-  };
-
-  // Load languages and meditation videos on mount
   useEffect(() => {
+    const loadLanguages = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/emotional-support/languages`);
+        if (response.ok) {
+          const { languages } = await response.json();
+          setLanguages(languages);
+        }
+      } catch (error) {
+        console.error('Failed to load languages:', error);
+      }
+    };
+
+    const loadMeditationVideos = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/emotional-support/meditation-videos`);
+        if (response.ok) {
+          // const data = await response.json();
+          // setMeditationVideos(data.videos);
+        }
+      } catch (error) {
+        console.error('Failed to load meditation videos:', error);
+      }
+    };
+
     loadLanguages();
     loadMeditationVideos();
-  }, [loadLanguages, loadMeditationVideos]);
+  }, [API_BASE_URL]);
 
   const formatTimestamp = (date: Date) => {
     return new Date(date).toLocaleTimeString('en-US', {
