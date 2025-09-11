@@ -1,4 +1,4 @@
-# Mind Mentor: AI-Powered Study Assistant 
+# Mind Mentor: AI-Powered Mental Health & Career Companion
 
 ## Table of Contents
 - [Overview](#overview)
