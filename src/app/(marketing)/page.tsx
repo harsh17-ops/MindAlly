@@ -36,11 +36,11 @@ export default function Page() {
       title: "24/7 Emotional Support Chatbot",
       description: "Get multilingual, AI-powered emotional support any time you need it."
     },
-    {
-      icon: <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-[#7fb236]" />,
-      title: "Time Management",
-      description: "Manage your time effectively and stay on top of your studies."
-    }
+    // {
+    //   icon: <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-[#7fb236]" />,
+    //   title: "Time Management",
+    //   description: "Manage your time effectively and stay on top of your studies."
+    // }
   ]
 
   return (
