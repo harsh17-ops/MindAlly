@@ -82,7 +82,7 @@ export default function EmotionalSupportChat() {
   useEffect(() => {
     loadLanguages();
     loadMeditationVideos();
-  }, []);
+  }, [loadLanguages, loadMeditationVideos]);
 
   const formatTimestamp = (date: Date) => {
     return new Date(date).toLocaleTimeString('en-US', {

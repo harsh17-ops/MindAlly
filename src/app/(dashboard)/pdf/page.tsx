@@ -30,7 +30,7 @@ export default function PdfListPage() {
     if (status === 'authenticated') {
       fetchDocuments();
     }
-  }, [status]);
+  }, [fetchDocuments]);
 
   const fetchDocuments = async () => {
     try {
@@ -272,4 +272,4 @@ export default function PdfListPage() {
       </div>
     </div>
   );
-} 
+}
