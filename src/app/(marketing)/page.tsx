@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, Brain, Clock, MessageCircle } from 'lucide-react'
+import { BookOpen, Brain, MessageCircle } from 'lucide-react'
 import { HeroSection } from '@/components/sections/HeroSection'
 import { FeaturesGrid } from '@/components/sections/FeatureGrid'
 import { useSession } from 'next-auth/react'
