@@ -5,13 +5,16 @@ import { aiRateLimiter } from './services/aiService.js';
 import dotenv from 'dotenv';
 import curateResourcesRouter from './routes/curateResources.js';
 import generatePlanRouter from './routes/generatePlan.js';
+
 import pdfChatRouter from './routes/pdfChat.js';
+import emotionalSupportChatRouter from './routes/emotionalSupportChat.js';
 import rateLimit from 'express-rate-limit';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 // Load environment variables
 dotenv.config();
+
 
 // Ensure required directories exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -74,6 +77,7 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/generate-plan', generatePlanRouter);
 app.use('/curate-resources', curateResourcesRouter);
 app.use('/pdf', pdfChatRouter);
+app.use('/emotional-support', emotionalSupportChatRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

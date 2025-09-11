@@ -1,0 +1,1 @@
+s/Mind Mentor/MindAlly/g
