@@ -1,4 +1,4 @@
-# Mind Mentor: AI-Powered Mental Health & Career Companion
+# MindAlly: AI-Powered Mental Health & Career Companion
 
 ## Table of Contents
 - [Overview](#overview)
@@ -20,7 +20,7 @@ https://github.com/user-attachments/assets/1ea26947-1dca-408d-9741-b24c3429944a
 
 ## Overview
 
-Mind Mentor is an intelligent study companion that leverages AI to transform the learning experience. It combines personalized study planning, resource curation, and interactive assistance to help students achieve their academic goals efficiently.
+MindAlly is an intelligent study companion that leverages AI to transform the learning experience. It combines personalized study planning, resource curation, and interactive assistance to help students achieve their academic goals efficiently.
 
 ## Key Features
 
