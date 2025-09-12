@@ -1,27 +1,34 @@
-# TODO: Create Emotional Support Chatbot
+# TODO: Get Emotional Support Chatbot Working in Localhost
 
-## Backend Implementation
-- [x] Create server/services/emotionalSupportService.js
-  - Implement AI-powered emotional support chat using Groq
-  - Add multilingual support
-  - Curate guided meditation video links
-  - Maintain chat history
+## Prerequisites
+- [ ] Ensure Node.js is installed (version 18+ recommended)
+- [ ] Ensure npm is installed
+- [ ] Set up environment variables in server/.env file
 
-- [x] Create server/routes/emotionalSupportChat.js
-  - Handle POST /chat for sending messages
-  - Handle GET /history for retrieving chat history
-  - Handle GET /meditation-videos for video recommendations
-  - Integrate with emotionalSupportService
+## Environment Variables Setup
+- [ ] GROQ_API_KEY: Get from https://console.groq.com/
+- [ ] CLAUDE_API_KEY: Get from https://console.anthropic.com/
+- [ ] MONGODB_URI: MongoDB connection string (local or cloud)
+- [ ] PORT: 5000 (default)
+- [ ] NEXT_PUBLIC_API_URL: http://localhost:5000
 
-## Frontend Implementation
-- [x] Create src/components/EmotionalSupportChat.tsx
-  - Chat interface with message input and display
-  - Support for displaying meditation videos
-  - Multilingual language selection
-  - Real-time chat updates
+## Backend Setup
+- [ ] Navigate to server directory
+- [ ] Install dependencies: npm install
+- [ ] Start backend server: npm run dev
 
-## Integration and Testing
-- [x] Update server/index.js to include new route
-- [x] Add navigation to chatbot in dashboard
-- [x] Test end-to-end functionality
-- [x] Add error handling and loading states
+## Frontend Setup
+- [ ] Navigate to root directory
+- [ ] Install dependencies: npm install
+- [ ] Start frontend: npm run dev
+
+## Testing
+- [ ] Open browser to http://localhost:3000/emotional-support
+- [ ] Test chat functionality
+- [ ] Verify API calls to backend
+
+## Troubleshooting
+- [ ] Check console logs for errors
+- [ ] Verify environment variables are loaded
+- [ ] Ensure MongoDB is running if using local database
+- [ ] Check CORS settings if frontend can't connect to backend

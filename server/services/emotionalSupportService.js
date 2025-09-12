@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import dotenv from 'dotenv';
+import UserLimit from "../models/UserLimit.js";
 
 // Initialize dotenv
 dotenv.config();
@@ -137,4 +138,56 @@ function getMeditationVideos() {
   return meditationVideos;
 }
 
-export { getEmotionalSupportResponse, getMeditationVideos, detectLanguage };
+const DAILY_LIMIT = 10; // Max requests per user per day
+
+// Get the current count for a user for today
+export async function getUserRequestCount(key) {
+  const record = await UserLimit.findOne({ key });
+  return record ? record.count : 0;
+}
+
+// Increment the count for a user for today
+export async function incrementUserRequestCount(key) {
+  const record = await UserLimit.findOne({ key });
+  if (record) {
+    record.count += 1;
+    record.updatedAt = new Date();
+    await record.save();
+  } else {
+    await UserLimit.create({ key, count: 1, updatedAt: new Date() });
+  }
+}
+
+async function getClaudeResponse(userId, message) {
+  // Check user request count (implement with DB or in-memory store)
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `${userId}:${today}`;
+  const count = await getUserRequestCount(key); // Implement this function
+
+  if (count >= DAILY_LIMIT) {
+    return { error: "Daily limit reached. Please try again tomorrow." };
+  }
+
+  // Call Claude API
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.CLAUDE_API_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "claude-3-opus-20240229",
+      max_tokens: 512,
+      messages: [{ role: "user", content: message }]
+    })
+  });
+
+  const data = await response.json();
+
+  // Increment user request count
+  await incrementUserRequestCount(key); // Implement this function
+
+  return { reply: data.content[0].text };
+}
+
+export { getEmotionalSupportResponse, getMeditationVideos, detectLanguage, getClaudeResponse };
