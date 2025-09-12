@@ -1,17 +1,13 @@
-import Groq from 'groq-sdk';
 import dotenv from 'dotenv';
+import UserLimit from "../models/UserLimit.js";
+import fetch from "node-fetch";
 
 // Initialize dotenv
 dotenv.config();
 
-if (!process.env.GROQ_API_KEY) {
-  throw new Error('GROQ_API_KEY is not set in environment variables');
+if (!process.env.CLAUDE_API_KEY) {
+  throw new Error('CLAUDE_API_KEY is not set in environment variables');
 }
-
-// Initialize Groq client
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
 
 // Curated list of guided meditation videos
 const meditationVideos = [
@@ -85,22 +81,45 @@ async function getEmotionalSupportResponse(message, chatHistory = [], language =
       content: msg.content
     }));
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...contextMessages,
-      { role: 'user', content: message }
-    ];
+    // Prepare messages for Claude API (Claude uses 'human' and 'assistant', system is separate)
+    const claudeMessages = [];
+    let systemMessage = systemPrompt;
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 500,
-      top_p: 1,
-      stream: false
+    // Add context messages
+    contextMessages.forEach(msg => {
+      if (msg.role === 'user') {
+        claudeMessages.push({ role: 'user', content: msg.content });
+      } else if (msg.role === 'assistant') {
+        claudeMessages.push({ role: 'assistant', content: msg.content });
+      }
     });
 
-    const response = completion.choices[0]?.message?.content || "I'm here to listen and support you.";
+    // Add current user message
+    claudeMessages.push({ role: 'user', content: message });
+
+    // Call Claude API
+    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.CLAUDE_API_KEY,
+        "content-type": "application/json",
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-3-opus-20240229",
+        system: systemMessage,
+        messages: claudeMessages,
+        temperature: 0.7,
+        max_tokens: 500
+      })
+    });
+
+    if (!claudeResponse.ok) {
+      throw new Error(`Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}`);
+    }
+
+    const data = await claudeResponse.json();
+    const response = data.content[0]?.text || "I'm here to listen and support you.";
 
     // Occasionally suggest meditation (about 20% of the time)
     const shouldSuggestMeditation = Math.random() < 0.2;
@@ -135,6 +154,62 @@ async function getEmotionalSupportResponse(message, chatHistory = [], language =
 // Function to get meditation videos
 function getMeditationVideos() {
   return meditationVideos;
+}
+
+const DAILY_LIMIT = 10; // Max requests per user per day
+
+// Get the current count for a user for today
+export async function getUserRequestCount(key) {
+  const record = await UserLimit.findOne({ key });
+  return record ? record.count : 0;
+}
+
+// Increment the count for a user for today
+export async function incrementUserRequestCount(key) {
+  const record = await UserLimit.findOne({ key });
+  if (record) {
+    record.count += 1;
+    record.updatedAt = new Date();
+    await record.save();
+  } else {
+    await UserLimit.create({ key, count: 1, updatedAt: new Date() });
+  }
+}
+
+export async function getClaudeResponse(userId, message) {
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `${userId}:${today}`;
+  const count = await getUserRequestCount(key);
+
+  if (count >= DAILY_LIMIT) {
+    return { error: "Daily limit reached. Please try again tomorrow." };
+  }
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.CLAUDE_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-3-opus-20240229",
+        max_tokens: 512,
+        messages: [{ role: "user", content: message }],
+      }),
+    });
+
+    const data = await response.json();
+    await incrementUserRequestCount(key);
+
+    return { reply: data.content[0].text };
+  } catch (error) {
+    console.error("Claude API error:", error);
+    return {
+      error:
+        "I'm sorry, I'm having trouble responding right now. Please try again later.",
+    };
+  }
 }
 
 export { getEmotionalSupportResponse, getMeditationVideos, detectLanguage };
