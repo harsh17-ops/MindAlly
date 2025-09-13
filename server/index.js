@@ -34,7 +34,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      "https://mind-mentor-pearl.vercel.app",
+      "https://mind-ally.vercel.app/",
       "https://mind-mentor.kartiklabhshetwar.me",
       "http://localhost:3000",
       "http://localhost:3001"
