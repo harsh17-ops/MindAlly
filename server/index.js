@@ -5,16 +5,16 @@ import { aiRateLimiter } from './services/aiService.js';
 import dotenv from 'dotenv';
 import curateResourcesRouter from './routes/curateResources.js';
 import generatePlanRouter from './routes/generatePlan.js';
-
 import pdfChatRouter from './routes/pdfChat.js';
 import emotionalSupportChatRouter from './routes/emotionalSupportChat.js';
 import rateLimit from 'express-rate-limit';
 import { mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+
 // Load environment variables
 dotenv.config();
-
+console.log("Claude API Key loaded:", process.env.CLAUDE_API_KEY ? "Yes" : "No");
 
 // Ensure required directories exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -30,7 +30,7 @@ const port = process.env.PORT || 5000;
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// Middleware
+// ✅ Updated CORS middleware
 app.use(
   cors({
     origin: [
@@ -41,10 +41,9 @@ app.use(
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-user-id"], // ✅ added here
   })
 );
-
 
 // Rate limiting configuration
 const limiter = rateLimit({
@@ -53,7 +52,6 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many requests from this IP, please try again after 15 minutes',
-  // Add trusted proxy configuration
   trustProxy: true
 });
 
@@ -82,8 +80,8 @@ app.use('/emotional-support', emotionalSupportChatRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
 app.listen(port, '0.0.0.0', () => {

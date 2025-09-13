@@ -45,7 +45,6 @@ const meditationVideos = [
 
 // Function to detect language from text
 function detectLanguage(text) {
-  // Simple language detection based on common words
   const englishWords = /\b(the|and|or|but|in|on|at|to|for|of|with|by)\b/i;
   const spanishWords = /\b(el|la|los|las|y|o|pero|en|sobre|a|para|de|con|por)\b/i;
   const frenchWords = /\b(le|la|les|et|ou|mais|dans|sur|à|pour|de|avec|par)\b/i;
@@ -65,34 +64,21 @@ async function getEmotionalSupportResponse(message, chatHistory = [], language =
       language = detectLanguage(message);
     }
 
-    // Prepare system prompt based on language
+    // Prepare system prompt
     const systemPrompts = {
       en: `You are a compassionate AI emotional support companion. Provide empathetic, supportive responses to help users with their emotional well-being. Listen actively, validate their feelings, and offer gentle guidance. Keep responses warm, non-judgmental, and encouraging. If appropriate, suggest meditation or mindfulness practices. Always respond in English.`,
-      es: `Eres un compañero de apoyo emocional AI compasivo. Proporciona respuestas empáticas y de apoyo para ayudar a los usuarios con su bienestar emocional. Escucha activamente, valida sus sentimientos y ofrece una guía suave. Mantén las respuestas cálidas, sin juzgar y alentadoras. Si es apropiado, sugiere meditación o prácticas de atención plena. Siempre responde en español.`,
-      fr: `Vous êtes un compagnon d'accompagnement émotionnel IA compatissant. Fournissez des réponses empathiques et de soutien pour aider les utilisateurs avec leur bien-être émotionnel. Écoutez activement, validez leurs sentiments et offrez une guidance douce. Gardez les réponses chaleureuses, non-jugeantes et encourageantes. Si approprié, suggérez la méditation ou les pratiques de pleine conscience. Répondez toujours en français.`,
-      de: `Sie sind ein mitfühlender KI-Emotional-Support-Begleiter. Bieten Sie empathische, unterstützende Antworten, um Benutzern bei ihrem emotionalen Wohlbefinden zu helfen. Hören Sie aktiv zu, validieren Sie ihre Gefühle und bieten Sie sanfte Führung. Halten Sie Antworten warm, nicht urteilend und ermutigend. Wenn angemessen, schlagen Sie Meditation oder Achtsamkeitspraktiken vor. Antworten Sie immer auf Deutsch.`
+      es: `Eres un compañero de apoyo emocional AI compasivo. Proporciona respuestas empáticas y de apoyo...`,
+      fr: `Vous êtes un compagnon d'accompagnement émotionnel IA compatissant...`,
+      de: `Sie sind ein mitfühlender KI-Emotional-Support-Begleiter...`
     };
 
-    const systemPrompt = systemPrompts[language] || systemPrompts.en;
+    const systemMessage = systemPrompts[language] || systemPrompts.en;
 
-    // Prepare chat history for context
-    const contextMessages = chatHistory.slice(-10).map(msg => ({
+    // Prepare chat history
+    const claudeMessages = chatHistory.slice(-10).map(msg => ({
       role: msg.role,
       content: msg.content
     }));
-
-    // Prepare messages for Claude API (Claude uses 'human' and 'assistant', system is separate)
-    const claudeMessages = [];
-    let systemMessage = systemPrompt;
-
-    // Add context messages
-    contextMessages.forEach(msg => {
-      if (msg.role === 'user') {
-        claudeMessages.push({ role: 'user', content: msg.content });
-      } else if (msg.role === 'assistant') {
-        claudeMessages.push({ role: 'assistant', content: msg.content });
-      }
-    });
 
     // Add current user message
     claudeMessages.push({ role: 'user', content: message });
@@ -115,28 +101,33 @@ async function getEmotionalSupportResponse(message, chatHistory = [], language =
     });
 
     if (!claudeResponse.ok) {
-      throw new Error(`Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}`);
+      const errorText = await claudeResponse.text();
+      console.error("Claude API error:", errorText);
+      throw new Error(`Claude API failed: ${claudeResponse.status} ${claudeResponse.statusText}`);
     }
 
     const data = await claudeResponse.json();
-    const response = data.content[0]?.text || "I'm here to listen and support you.";
+    console.log("Claude API response:", JSON.stringify(data, null, 2));
 
-    // Occasionally suggest meditation (about 20% of the time)
+    let responseText = "I'm here to listen and support you.";
+    if (data.content && Array.isArray(data.content)) {
+      responseText = data.content
+        .filter(part => part.type === "text")
+        .map(part => part.text)
+        .join("\n");
+    }
+
+    // Occasionally suggest meditation
     const shouldSuggestMeditation = Math.random() < 0.2;
     let meditationSuggestion = null;
 
     if (shouldSuggestMeditation) {
       const randomVideo = meditationVideos[Math.floor(Math.random() * meditationVideos.length)];
-      meditationSuggestion = {
-        title: randomVideo.title,
-        url: randomVideo.url,
-        duration: randomVideo.duration,
-        description: randomVideo.description
-      };
+      meditationSuggestion = randomVideo;
     }
 
     return {
-      response: response,
+      response: responseText,
       language: language,
       meditationSuggestion: meditationSuggestion
     };
@@ -156,15 +147,15 @@ function getMeditationVideos() {
   return meditationVideos;
 }
 
-const DAILY_LIMIT = 10; // Max requests per user per day
+const DAILY_LIMIT = 10;
 
-// Get the current count for a user for today
+// Get the current count for a user
 export async function getUserRequestCount(key) {
   const record = await UserLimit.findOne({ key });
   return record ? record.count : 0;
 }
 
-// Increment the count for a user for today
+// Increment the count for a user
 export async function incrementUserRequestCount(key) {
   const record = await UserLimit.findOne({ key });
   if (record) {
@@ -191,6 +182,7 @@ export async function getClaudeResponse(userId, message) {
       headers: {
         "x-api-key": process.env.CLAUDE_API_KEY,
         "content-type": "application/json",
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: "claude-3-opus-20240229",
@@ -199,15 +191,32 @@ export async function getClaudeResponse(userId, message) {
       }),
     });
 
-    const data = await response.json();
-    await incrementUserRequestCount(key);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Claude API error:", errorText);
+      throw new Error(`Claude API failed: ${response.status} ${response.statusText}`);
+    }
 
-    return { reply: data.content[0].text };
+    const data = await claudeResponse.json();
+    console.log("Claude API response:", JSON.stringify(data, null, 2));
+
+    await incrementUserRequestCount(key);
+    
+
+    let reply = "I'm here to listen and support you.";
+    if (data.content && Array.isArray(data.content)) {
+      reply = data.content
+        .filter(part => part.type === "text")
+        .map(part => part.text)
+        .join("\n");
+    }
+
+    return { reply };
+
   } catch (error) {
-    console.error("Claude API error:", error);
+    console.error("Error in getClaudeResponse:", error);
     return {
-      error:
-        "I'm sorry, I'm having trouble responding right now. Please try again later.",
+      error: "I'm sorry, I'm having trouble responding right now. Please try again later.",
     };
   }
 }
