@@ -1,13 +1,17 @@
 import dotenv from 'dotenv';
 import UserLimit from "../models/UserLimit.js";
-import fetch from "node-fetch";
+import Groq from 'groq-sdk';
 
 // Initialize dotenv
 dotenv.config();
 
-if (!process.env.CLAUDE_API_KEY) {
-  throw new Error('CLAUDE_API_KEY is not set in environment variables');
+if (!process.env.GROQ_API_KEY) {
+  throw new Error('GROQ_API_KEY is not set in environment variables');
 }
+
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
 // Curated list of guided meditation videos
 const meditationVideos = [
@@ -56,7 +60,7 @@ function detectLanguage(text) {
   return 'en'; // Default to English
 }
 
-// Function to get emotional support response
+// Function to get emotional support response using GROQ
 async function getEmotionalSupportResponse(message, chatHistory = [], language = 'en') {
   try {
     // Detect language if not provided
@@ -67,55 +71,38 @@ async function getEmotionalSupportResponse(message, chatHistory = [], language =
     // Prepare system prompt
     const systemPrompts = {
       en: `You are a compassionate AI emotional support companion. Provide empathetic, supportive responses to help users with their emotional well-being. Listen actively, validate their feelings, and offer gentle guidance. Keep responses warm, non-judgmental, and encouraging. If appropriate, suggest meditation or mindfulness practices. Always respond in English.`,
-      es: `Eres un compañero de apoyo emocional AI compasivo. Proporciona respuestas empáticas y de apoyo...`,
-      fr: `Vous êtes un compagnon d'accompagnement émotionnel IA compatissant...`,
-      de: `Sie sind ein mitfühlender KI-Emotional-Support-Begleiter...`
+      es: `Eres un compañero de apoyo emocional AI compasivo. Proporciona respuestas empáticas y de apoyo para ayudar a los usuarios con su bienestar emocional. Escucha activamente, valida sus sentimientos y ofrece orientación suave. Mantén las respuestas cálidas, sin juicios y alentadoras.`,
+      fr: `Vous êtes un compagnon d'accompagnement émotionnel IA compatissant. Fournissez des réponses empathiques et de soutien pour aider les utilisateurs avec leur bien-être émotionnel.`,
+      de: `Sie sind ein mitfühlender KI-Emotional-Support-Begleiter. Bieten Sie einfühlsame, unterstützende Antworten, um Benutzern bei ihrem emotionalen Wohlbefinden zu helfen.`
     };
 
     const systemMessage = systemPrompts[language] || systemPrompts.en;
 
-    // Prepare chat history
-    const claudeMessages = chatHistory.slice(-10).map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    // Prepare chat history for GROQ
+    const messages = [
+      { role: 'system', content: systemMessage }
+    ];
 
-    // Add current user message
-    claudeMessages.push({ role: 'user', content: message });
-
-    // Call Claude API
-    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.CLAUDE_API_KEY,
-        "content-type": "application/json",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-opus-20240229",
-        system: systemMessage,
-        messages: claudeMessages,
-        temperature: 0.7,
-        max_tokens: 500
-      })
+    // Add chat history
+    chatHistory.slice(-5).forEach(msg => {
+      messages.push({
+        role: msg.role,
+        content: msg.content
+      });
     });
 
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error("Claude API error:", errorText);
-      throw new Error(`Claude API failed: ${claudeResponse.status} ${claudeResponse.statusText}`);
-    }
+    // Add current user message
+    messages.push({ role: 'user', content: message });
 
-    const data = await claudeResponse.json();
-    console.log("Claude API response:", JSON.stringify(data, null, 2));
+    // Call GROQ API - UPDATE THIS MODEL
+    const response = await groq.chat.completions.create({
+      messages: messages,
+      model: 'llama-3.1-8b-instant', // Changed from 'llama3-8b-8192'
+      temperature: 0.7,
+      max_tokens: 500
+    });
 
-    let responseText = "I'm here to listen and support you.";
-    if (data.content && Array.isArray(data.content)) {
-      responseText = data.content
-        .filter(part => part.type === "text")
-        .map(part => part.text)
-        .join("\n");
-    }
+    let responseText = response.choices[0]?.message?.content || "I'm here to listen and support you.";
 
     // Occasionally suggest meditation
     const shouldSuggestMeditation = Math.random() < 0.2;
@@ -167,7 +154,8 @@ export async function incrementUserRequestCount(key) {
   }
 }
 
-export async function getClaudeResponse(userId, message) {
+// Updated function to use GROQ instead of Claude
+export async function getGroqResponse(userId, message) {
   const today = new Date().toISOString().slice(0, 10);
   const key = `${userId}:${today}`;
   const count = await getUserRequestCount(key);
@@ -177,44 +165,27 @@ export async function getClaudeResponse(userId, message) {
   }
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": process.env.CLAUDE_API_KEY,
-        "content-type": "application/json",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-3-opus-20240229",
-        max_tokens: 512,
-        messages: [{ role: "user", content: message }],
-      }),
+    const response = await groq.chat.completions.create({
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a compassionate AI emotional support companion. Provide empathetic, supportive responses to help users with their emotional well-being.' 
+        },
+        { role: 'user', content: message }
+      ],
+      model: 'llama-3.1-8b-instant', // Changed from 'llama3-8b-8192'
+      temperature: 0.7,
+      max_tokens: 512
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Claude API error:", errorText);
-      throw new Error(`Claude API failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await claudeResponse.json();
-    console.log("Claude API response:", JSON.stringify(data, null, 2));
-
     await incrementUserRequestCount(key);
-    
 
-    let reply = "I'm here to listen and support you.";
-    if (data.content && Array.isArray(data.content)) {
-      reply = data.content
-        .filter(part => part.type === "text")
-        .map(part => part.text)
-        .join("\n");
-    }
+    const reply = response.choices[0]?.message?.content || "I'm here to listen and support you.";
 
     return { reply };
 
   } catch (error) {
-    console.error("Error in getClaudeResponse:", error);
+    console.error("Error in getGroqResponse:", error);
     return {
       error: "I'm sorry, I'm having trouble responding right now. Please try again later.",
     };
@@ -222,3 +193,108 @@ export async function getClaudeResponse(userId, message) {
 }
 
 export { getEmotionalSupportResponse, getMeditationVideos, detectLanguage };
+
+export const generateEmotionalSupport = async (userMessage, mood, context = {}) => {
+  try {
+    const systemPrompt = `You are an empathetic AI companion specializing in emotional support and mental wellness. 
+    
+Your role:
+- Provide compassionate, non-judgmental responses
+- Offer practical coping strategies and mindfulness techniques
+- Encourage positive thinking while validating emotions
+- Suggest healthy activities and self-care practices
+- Know when to recommend professional help for serious concerns
+
+Guidelines:
+- Be warm, understanding, and supportive
+- Use active listening techniques in your responses
+- Avoid giving medical advice or diagnoses
+- Keep responses concise but meaningful (2-3 paragraphs max)
+- Include actionable suggestions when appropriate
+
+Current user context:
+- Mood: ${mood || 'not specified'}
+- Additional context: ${JSON.stringify(context)}`;
+
+    const userPrompt = `I'm feeling like this: ${userMessage}
+
+Please provide emotional support and practical suggestions to help me feel better.`;
+
+    const response = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      model: 'llama-3.1-8b-instant', // Changed from 'llama3-8b-8192'
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    return {
+      success: true,
+      response: response.choices[0]?.message?.content || 'I understand you\'re going through a difficult time. Remember that it\'s okay to feel this way, and you\'re not alone.',
+      mood: mood,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('Error generating emotional support:', error);
+    
+    // Fallback response if API fails
+    return {
+      success: false,
+      response: `I'm here to support you. While I'm having technical difficulties right now, please remember that your feelings are valid and this difficult moment will pass. Consider reaching out to a trusted friend, family member, or professional counselor if you need additional support.`,
+      mood: mood,
+      timestamp: new Date().toISOString(),
+      error: error.message
+    };
+  }
+};
+
+export const generateMoodInsights = async (moodHistory) => {
+  try {
+    const systemPrompt = `You are a wellness coach analyzing mood patterns to provide helpful insights.
+
+Your role:
+- Analyze mood trends and patterns
+- Identify potential triggers or positive influences
+- Suggest personalized wellness strategies
+- Provide encouraging and actionable feedback
+
+Guidelines:
+- Be supportive and non-judgmental
+- Focus on patterns and trends, not individual data points
+- Suggest practical improvements
+- Keep insights concise and actionable`;
+
+    const userPrompt = `Based on this mood history: ${JSON.stringify(moodHistory)}
+
+Please provide insights about mood patterns and suggestions for improvement.`;
+
+    const response = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      model: 'llama-3.1-8b-instant', // Changed from 'llama3-8b-8192'
+      temperature: 0.6,
+      max_tokens: 400
+    });
+
+    return {
+      success: true,
+      insights: response.choices[0]?.message?.content || 'Your mood tracking shows you\'re taking positive steps toward wellness. Keep monitoring your feelings and practicing self-care.',
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('Error generating mood insights:', error);
+    
+    return {
+      success: false,
+      insights: 'Mood tracking is a valuable tool for understanding your emotional patterns. Continue logging your feelings and consider discussing trends with a healthcare provider.',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    };
+  }
+};

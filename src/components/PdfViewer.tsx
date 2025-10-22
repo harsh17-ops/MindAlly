@@ -134,7 +134,7 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
   }, []);
 
   // Fetch PDF data
-  const fetchPdf = useCallback(async () => {
+  const fetchPdf = async () => {
     if (!documentId) {
       setUiState(prev => ({ ...prev, error: 'No document ID specified' }));
       return;
@@ -163,7 +163,7 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
     } finally {
       setUiState(prev => ({ ...prev, loading: false }));
     }
-  }, [documentId]);
+  };
 
   // Handlers
   const handlePageChange = useCallback((offset: number) => {
@@ -199,7 +199,7 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
   // Effects
   useEffect(() => {
     fetchPdf();
-  }, [fetchPdf]);
+  }, [documentId]); // ✅ Only depend on documentId
 
   useEffect(() => {
     if (currentPage && currentPage !== viewState.pageNumber) {
@@ -495,4 +495,4 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
       </ScrollArea>
     </div>
   );
-} 
+}

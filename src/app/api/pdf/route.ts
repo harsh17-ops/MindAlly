@@ -4,15 +4,12 @@ import { getToken } from 'next-auth/jwt';
 // List all PDFs
 export async function GET(req: NextRequest) {
   try {
-    
-    // Get the session token
     const token = await getToken({ 
       req,
       secret: process.env.NEXTAUTH_SECRET 
     });
 
     if (!token || !token.id) {
-      console.log('No authentication token or user ID found');
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
@@ -21,8 +18,12 @@ export async function GET(req: NextRequest) {
 
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
     
+    // 🚨 Add this debug logging
+    console.log('🐛 API URL:', apiUrl);
+    console.log('🐛 Calling:', `${apiUrl}/pdf`);
+    console.log('🐛 Request URL:', req.url);
+    
     try {
-      // Forward the request with user ID in headers
       const response = await fetch(`${apiUrl}/pdf`, {
         method: 'GET',
         headers: {
@@ -159,4 +160,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
