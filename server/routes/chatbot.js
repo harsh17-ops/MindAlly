@@ -1,13 +1,13 @@
 import express from "express";
 import { connectMongoDB } from "../lib/mongodb.js";
-import { getClaudeResponse } from "../services/emotionalSupportService.js";
+import { getGroqResponse } from "../services/emotionalSupportService.js";
 
 const router = express.Router();
 
 router.post("/chatbot", async (req, res) => {
   await connectMongoDB();
   const { userId, message } = req.body;
-  const result = await getClaudeResponse(userId, message);
+  const result = await getGroqResponse(userId, message);
 
   if (result.error) {
     return res.status(429).json({ error: result.error });

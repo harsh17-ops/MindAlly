@@ -1,11 +1,11 @@
 'use client';
 
-import EmotionalSupportChat from '@/components/EmotionalSupportChat';
+import EnhancedEmotionalSupportChat from '@/components/EnhancedEmotionalSupportChat';
 
 export default function EmotionalSupportPage() {
   return (
     <div className="h-full min-h-screen p-4">
-      <EmotionalSupportChat />
+      <EnhancedEmotionalSupportChat />
     </div>
   );
 }

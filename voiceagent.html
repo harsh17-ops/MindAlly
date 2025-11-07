@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindAlly Voice Assistant</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* A simple pulse animation for the 'listening' state */
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+            100% { box-shadow: 0 0 0 20px rgba(52, 211, 153, 0); }
+        }
+        .pulse-listening {
+            animation: pulse-ring 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex items-center justify-center font-sans p-4">
+
+    <!-- Main Card -->
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
+        
+        <!-- Header -->
+        <h1 class="text-3xl font-bold mb-2 text-white">MindAlly Assistant</h1>
+        <p class="text-gray-400 mb-8">Your AI-powered companion. Press 'Start' to talk.</p>
+
+        <!-- Status Indicator -->
+        <div class="mb-8">
+            <p id="status-indicator" class="text-lg text-yellow-400 font-medium h-6">Ready</p>
+        </div>
+
+        <!-- Call Control Buttons -->
+        <div class="flex flex-col gap-4">
+            <button id="start-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                Start Call
+            </button>
+            <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                End Call
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Vapi SDK and Logic -->
+    <script type="module">
+        // Import Vapi SDK from the CDN - This link is correct.
+        import Vapi from 'https://esm.sh/@vapi-ai/web';
+
+        // --- 1. PASTE YOUR KEYS HERE ---
+        // Get these from your Vapi dashboard
+        const VAPI_PUBLIC_KEY = '76626886-55e1-4f58-8806-55c42c31e0d7';
+        const VAPI_ASSISTANT_ID = '469c96f1-4524-4ba4-94d4-04f1c2770f03';
+        // --------------------------------
+
+        // Get UI elements
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusIndicator = document.getElementById('status-indicator');
+
+        // Initialize Vapi
+        const vapi = new Vapi(VAPI_PUBLIC_KEY);
+
+        // Helper function to update button and status UI
+        function updateUI(isCalling) {
+            if (isCalling) {
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                startBtn.classList.add('pulse-listening'); // Add pulse
+            } else {
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusIndicator.textContent = 'Ready';
+                startBtn.classList.remove('pulse-listening'); // Remove pulse
+            }
+        }
+
+        // --- 2. Define Call Functions ---
+
+        const startCall = () => {
+            console.log('Starting call...');
+            statusIndicator.textContent = 'Connecting...';
+            
+            // Check if Vapi is configured with keys
+            if (VAPI_PUBLIC_KEY === 'YOUR_VAPI_PUBLIC_KEY' || VAPI_ASSISTANT_ID === 'YOUR_VAPI_ASSISTANT_ID') {
+                statusIndicator.textContent = 'Error: Vapi keys not set.';
+                console.error("Vapi keys are not set in index.html. Please edit lines 77 and 78.");
+                return;
+            }
+
+            // Start the call with your specific assistant
+            vapi.start(VAPI_ASSISTANT_ID);
+        };
+
+        const stopCall = () => {
+            console.log('Stopping call...');
+            statusIndicator.textContent = 'Ending call...';
+            vapi.stop();
+        };
+
+        // --- 3. Wire Up Event Listeners ---
+
+        // Add click listeners to buttons
+        startBtn.addEventListener('click', startCall);
+        stopBtn.addEventListener('click', stopCall);
+
+        // --- Vapi Event Listeners ---
+
+        vapi.on('call-start', () => {
+            console.log('Call has started.');
+            statusIndicator.textContent = 'Listening...';
+            updateUI(true);
+        });
+
+        vapi.on('call-end', () => {
+            console.log('Call has ended.');
+            updateUI(false);
+        });
+
+        vapi.on('speech-start', () => {
+            console.log('Assistant is speaking...');
+            statusIndicator.textContent = 'Assistant is speaking...';
+            startBtn.classList.remove('pulse-listening'); // Stop pulse when assistant talks
+        });
+
+        vapi.on('speech-end', () => {
+            console.log('Assistant finished speaking.');
+            statusIndicator.textContent = 'Listening...';
+            startBtn.classList.add('pulse-listening'); // Resume pulse
+        });
+
+        vapi.on('error', (e) => {
+            console.error('Vapi error:', e);
+            statusIndicator.textContent = 'An error occurred.';
+            updateUI(false);
+        });
+
+        // (Optional) Log all messages for debugging
+        vapi.on('message', (msg) => {
+            console.log('Vapi Message:', msg);
+        });
+
+        // Set initial button state on page load
+        updateUI(false);
+
+    </script>
+</body>
+</html>
+
