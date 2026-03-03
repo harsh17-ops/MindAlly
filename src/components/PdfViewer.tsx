@@ -133,8 +133,8 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
     touchRef.current.isDragging = false;
   }, []);
 
-  // Fetch PDF data
-  const fetchPdf = async () => {
+  // Fetch PDF data (memoized)
+  const fetchPdf = useCallback(async () => {
     if (!documentId) {
       setUiState(prev => ({ ...prev, error: 'No document ID specified' }));
       return;
@@ -163,7 +163,7 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
     } finally {
       setUiState(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, [documentId]);
 
   // Handlers
   const handlePageChange = useCallback((offset: number) => {
@@ -199,7 +199,7 @@ export default function PdfViewer({ documentId, currentPage, onPageChange }: Pdf
   // Effects
   useEffect(() => {
     fetchPdf();
-  }, [documentId]); // ✅ Only depend on documentId
+  }, [fetchPdf]); // fetchPdf is memoized with documentId
 
   useEffect(() => {
     if (currentPage && currentPage !== viewState.pageNumber) {

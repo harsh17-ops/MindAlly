@@ -134,7 +134,9 @@ export default function PdfChat({ documentId }: PdfChatProps) {
         let errorData;
         try {
           errorData = await response.json();
-        } catch (e) {
+        } catch (err) {
+          // parsing the error response failed; log for debugging
+          console.error('Failed to parse error JSON', err);
           errorData = { error: `Server error: ${response.status} ${response.statusText}` };
         }
         
