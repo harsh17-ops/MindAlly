@@ -15,9 +15,14 @@ An intelligent study and emotional wellness platform that combines personalized 
 
 ## Demo
 
+### Project Walkthrough
 
+<video width="800" height="600" controls>
+  <source src="mindally.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
-https://github.com/user-attachments/assets/1ea26947-1dca-408d-9741-b24c3429944a
+**[Watch on GitHub](https://github.com/user-attachments/assets/1ea26947-1dca-408d-9741-b24c3429944a)**
 
 
 
