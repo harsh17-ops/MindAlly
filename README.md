@@ -22,7 +22,7 @@ An intelligent study and emotional wellness platform that combines personalized 
   Your browser does not support the video tag.
 </video>
 
-**[Watch on GitHub](https://github.com/user-attachments/assets/1ea26947-1dca-408d-9741-b24c3429944a)**
+
 
 
 
