@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    // install devDependencies (typescript, @types/node) before building on platforms
+    // that skip dev deps (e.g. Render with NODE_ENV=production)
+    "build": "npm install --include=dev && next build",
     "start": "next start",
     "lint": "next lint"
   },
