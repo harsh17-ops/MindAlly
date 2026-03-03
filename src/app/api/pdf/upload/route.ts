@@ -31,8 +31,9 @@ export async function POST(req: NextRequest) {
     backendFormData.append('pdf', file);
 
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
-    const response = await fetch(`${apiUrl}/pdf/upload`, {
+    const response = await fetch(`${apiEndpoint}/pdf/upload`, {
       method: 'POST',
       headers: {
         'X-User-Id': token.sub || '',

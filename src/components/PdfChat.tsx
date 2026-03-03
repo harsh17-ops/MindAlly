@@ -131,8 +131,18 @@ export default function PdfChat({ documentId }: PdfChatProps) {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to get response');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: `Server error: ${response.status} ${response.statusText}` };
+        }
+        
+        const errorMessage = errorData.error || errorData.message || 'Failed to get response';
+        const errorDetails = errorData.details;
+        
+        console.error('Chat API error:', errorMessage, errorDetails);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

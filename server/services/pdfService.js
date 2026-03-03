@@ -16,19 +16,40 @@ dotenv.config();
 // Initialize cache with 1 hour TTL
 const cache = new NodeCache({ stdTTL: 3600 });
 
-// Initialize Groq
-const model = new ChatGroq({
-  apiKey: process.env.GROQ_API_KEY_RAG,
-  modelName: "llama-3.3-70b-versatile",
-});
+// Initialize Groq - Use GROQ_API_KEY_RAG if available, otherwise fall back to GROQ_API_KEY
+let model;
+try {
+  const groqApiKey = process.env.GROQ_API_KEY_RAG || process.env.GROQ_API_KEY;
+  if (!groqApiKey) {
+    console.warn('Neither GROQ_API_KEY_RAG nor GROQ_API_KEY is set - PDF chat will not work');
+  } else {
+    model = new ChatGroq({
+      apiKey: groqApiKey,
+      modelName: "llama-3.3-70b-versatile",
+      timeout: 60000, // 60 second timeout
+    });
+    console.log('Groq model initialized for PDF chat');
+  }
+} catch (modelError) {
+  console.error('Error initializing Groq model:', modelError);
+}
 
 // Initialize HuggingFace embeddings with optimized settings
-const embeddings = new HuggingFaceInferenceEmbeddings({
-  apiKey: process.env.HUGGINGFACE_API_KEY,
-  model: "sentence-transformers/all-MiniLM-L6-v2",
-  batchSize: 512, // Process more text at once
-  stripNewLines: true // Remove unnecessary newlines
-});
+let embeddings;
+try {
+  if (!process.env.HUGGINGFACE_API_KEY) {
+    console.warn('HUGGINGFACE_API_KEY is not set - PDF chat will not work');
+  } else {
+    embeddings = new HuggingFaceInferenceEmbeddings({
+      apiKey: process.env.HUGGINGFACE_API_KEY,
+      model: "sentence-transformers/all-MiniLM-L6-v2",
+      batchSize: 512, // Process more text at once
+      stripNewLines: true // Remove unnecessary newlines
+    });
+  }
+} catch (embeddingError) {
+  console.error('Error initializing HuggingFace embeddings:', embeddingError);
+}
 
 // Vector store to hold embeddings
 const vectorStores = new Map();
@@ -209,30 +230,97 @@ export async function processPdf(input) {
 
 /**
  * Chat with PDF using RAG
+ * @param {Buffer|string} pdfInput - PDF buffer or base64 string
+ * @param {string} question - User's question
+ * @param {Array} chatHistory - Previous chat messages
+ * @param {Array} storedChunks - Pre-processed document chunks (optional, for performance)
  */
-export async function chatWithPdf(pdfInput, question, chatHistory = []) {
+export async function chatWithPdf(pdfInput, question, chatHistory = [], storedChunks = null) {
   try {
-    let buffer;
-    if (Buffer.isBuffer(pdfInput)) {
-      buffer = pdfInput;
+    let documentChunks;
+    
+    // Use stored chunks if available (much faster)
+    if (storedChunks && Array.isArray(storedChunks) && storedChunks.length > 0) {
+      console.log(`Using ${storedChunks.length} stored document chunks for faster processing`);
+      // Convert MongoDB documents to plain objects if needed
+      documentChunks = storedChunks.map(chunk => {
+        if (chunk.toObject) {
+          return chunk.toObject();
+        }
+        return chunk;
+      });
     } else {
-      buffer = base64ToBuffer(pdfInput);
+      // Process the PDF to get chunks (slower, but necessary if chunks aren't stored)
+      console.log('Processing PDF to extract chunks...');
+      let buffer;
+      if (Buffer.isBuffer(pdfInput)) {
+        buffer = pdfInput;
+      } else {
+        try {
+          buffer = base64ToBuffer(pdfInput);
+        } catch (bufferError) {
+          throw new Error(`Failed to convert PDF data: ${bufferError.message}`);
+        }
+      }
+      const processed = await processPdf(buffer);
+      documentChunks = processed.documentChunks;
     }
 
-    // Process the PDF to get chunks
-    const { documentChunks } = await processPdf(buffer);
+    if (!documentChunks || documentChunks.length === 0) {
+      throw new Error('No document chunks available. The PDF may be empty or corrupted.');
+    }
 
     // Convert chunks to the format expected by the vector store
-    const vectorStoreDocuments = documentChunks.map(chunk => ({
-      pageContent: chunk.text,
-      metadata: chunk.metadata
-    }));
+    const vectorStoreDocuments = documentChunks
+      .map(chunk => {
+        // Handle different chunk formats
+        const text = chunk.text || chunk.pageContent || '';
+        const metadata = chunk.metadata || { 
+          pageNumber: chunk.pageNumber || 1, 
+          location: chunk.location || '' 
+        };
+        
+        return {
+          pageContent: text,
+          metadata: metadata
+        };
+      })
+      .filter(chunk => chunk.pageContent && chunk.pageContent.trim().length > 0);
+
+    if (vectorStoreDocuments.length === 0) {
+      throw new Error('No valid document chunks found. The PDF may be empty or corrupted.');
+    }
+
+    // Validate embeddings are initialized
+    if (!embeddings) {
+      throw new Error('HuggingFace embeddings are not initialized. Please check HUGGINGFACE_API_KEY environment variable.');
+    }
 
     // Create vector store from chunks
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      vectorStoreDocuments,
-      embeddings
-    );
+    console.log(`Creating vector store with ${vectorStoreDocuments.length} chunks...`);
+    let vectorStore;
+    try {
+      // Limit the number of chunks to process to avoid timeout
+      const maxChunks = 100; // Process max 100 chunks at a time
+      const chunksToProcess = vectorStoreDocuments.slice(0, maxChunks);
+      
+      if (chunksToProcess.length < vectorStoreDocuments.length) {
+        console.log(`Processing ${chunksToProcess.length} of ${vectorStoreDocuments.length} chunks to avoid timeout`);
+      }
+      
+      vectorStore = await MemoryVectorStore.fromDocuments(
+        chunksToProcess,
+        embeddings
+      );
+    } catch (embeddingError) {
+      console.error('Error creating embeddings:', embeddingError);
+      console.error('Embedding error details:', {
+        name: embeddingError.name,
+        message: embeddingError.message,
+        stack: embeddingError.stack
+      });
+      throw new Error(`Failed to create document embeddings: ${embeddingError.message}`);
+    }
 
     // Cache key for the query
     const cacheKey = `pdf_query_${question}_${chatHistory.length}`;
@@ -242,10 +330,30 @@ export async function chatWithPdf(pdfInput, question, chatHistory = []) {
     }
 
     // Retrieve relevant documents
-    const retrievedDocs = await vectorStore.similaritySearch(question, 3);
+    console.log('Searching for relevant document sections...');
+    let retrievedDocs;
+    try {
+      retrievedDocs = await vectorStore.similaritySearch(question, 3);
+    } catch (searchError) {
+      console.error('Error in similarity search:', searchError);
+      throw new Error(`Failed to search document: ${searchError.message}`);
+    }
+    
+    if (!retrievedDocs || retrievedDocs.length === 0) {
+      throw new Error('No relevant content found in the document for your question.');
+    }
     
     // Format documents content
     const context = retrievedDocs.map(doc => doc.pageContent).join('\n\n');
+
+    if (!context || context.trim().length === 0) {
+      throw new Error('No context extracted from document for answering the question.');
+    }
+
+    // Validate model is initialized
+    if (!model) {
+      throw new Error('Groq model is not initialized. Please check GROQ_API_KEY_RAG or GROQ_API_KEY environment variable.');
+    }
 
     // Create the RAG chain
     const chain = RunnableSequence.from([
@@ -258,10 +366,26 @@ export async function chatWithPdf(pdfInput, question, chatHistory = []) {
       new StringOutputParser()
     ]);
 
-    // Generate response
-    const response = await chain.invoke({
-      question: question
-    });
+    // Generate response with timeout
+    console.log('Generating AI response...');
+    let response;
+    try {
+      response = await Promise.race([
+        chain.invoke({
+          question: question
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI response timeout - the request took too long')), 60000)
+        )
+      ]);
+    } catch (chainError) {
+      console.error('Error in AI chain:', chainError);
+      throw new Error(`Failed to generate AI response: ${chainError.message}`);
+    }
+
+    if (!response || typeof response !== 'string') {
+      throw new Error('Invalid response format from AI model');
+    }
 
     // Extract source pages
     const sourcePages = [...new Set(

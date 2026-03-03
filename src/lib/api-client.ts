@@ -1,8 +1,9 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_ENDPOINT = `${API_BASE_URL}/api`;
 
 export const apiClient = {
   async getCuratedResources(userId: string) {
-    const url = `${API_BASE_URL}/curate-resources/${userId}`;
+    const url = `${API_ENDPOINT}/curate-resources/${userId}`;
     
     const response = await fetch(url, {
       headers: {
@@ -16,7 +17,7 @@ export const apiClient = {
   },
 
   async createCuratedResources(userId: string, subject: string) {
-    const response = await fetch(`${API_BASE_URL}/curate-resources`, {
+    const response = await fetch(`${API_ENDPOINT}/curate-resources`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,7 +45,7 @@ export const apiClient = {
   },
 
   async getStudyPlan(userId: string) {
-    const response = await fetch(`${API_BASE_URL}/generate-plan/${userId}`, {
+    const response = await fetch(`${API_ENDPOINT}/generate-plan/${userId}`, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -56,7 +57,7 @@ export const apiClient = {
   },
 
   async createStudyPlan(userId: string, subject: string, examDate: string) {
-    const response = await fetch(`${API_BASE_URL}/generate-plan`, {
+    const response = await fetch(`${API_ENDPOINT}/generate-plan`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export const apiClient = {
   },
 
   async deleteStudyPlan(planId: string) {
-    const response = await fetch(`${API_BASE_URL}/generate-plan/${planId}`, {
+    const response = await fetch(`${API_ENDPOINT}/generate-plan/${planId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -106,7 +107,7 @@ export const apiClient = {
   },
 
   async deleteCuratedResources(resourceId: string) {
-    const response = await fetch(`${API_BASE_URL}/curate-resources/${resourceId}`, {
+    const response = await fetch(`${API_ENDPOINT}/curate-resources/${resourceId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

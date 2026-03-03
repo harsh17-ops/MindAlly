@@ -6,6 +6,8 @@
     <title>MindAlly Voice Assistant</title>
     <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vapi Web SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web/dist/vapi.js"></script>
     <style>
         /* A simple pulse animation for the 'listening' state */
         @keyframes pulse-ring {
@@ -15,12 +17,19 @@
         .pulse-listening {
             animation: pulse-ring 1.5s infinite;
         }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen flex items-center justify-center font-sans p-4">
 
     <!-- Main Card -->
-    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-md w-full">
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-md w-full fade-in">
         
         <!-- Header -->
         <h1 class="text-3xl font-bold mb-2 text-white">MindAlly Assistant</h1>
@@ -28,7 +37,7 @@
 
         <!-- Status Indicator -->
         <div class="mb-8">
-            <p id="status-indicator" class="text-lg text-yellow-400 font-medium h-6">Ready</p>
+            <p id="status-indicator" class="text-lg text-yellow-400 font-medium h-6 min-h-6">Ready</p>
         </div>
 
         <!-- Call Control Buttons -->
@@ -36,114 +45,222 @@
             <button id="start-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                 Start Call
             </button>
-            <button id="stop-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+            <button id="stop-btn" disabled class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                 End Call
             </button>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="mt-8 text-xs text-gray-500">
+            <p>SDK Status: <span id="sdk-status">Loading...</span></p>
+            <p>Browser: <span id="browser-info">Checking...</span></p>
         </div>
 
     </div>
 
     <!-- Vapi SDK and Logic -->
-    <script type="module">
-        // Import Vapi SDK from the CDN - This link is correct.
-        import Vapi from 'https://esm.sh/@vapi-ai/web';
+    <script>
+        console.log('=== MindAlly Voice Agent Debug ===');
+        console.log('Script loading...');
+        console.log('Vapi object available:', typeof Vapi !== 'undefined');
+        console.log('Window.Vapi:', window.Vapi);
 
-        // --- 1. PASTE YOUR KEYS HERE ---
-        // Get these from your Vapi dashboard
-        const VAPI_PUBLIC_KEY = '76626886-55e1-4f58-8806-55c42c31e0d7';
-        const VAPI_ASSISTANT_ID = '469c96f1-4524-4ba4-94d4-04f1c2770f03';
-        // --------------------------------
+        // Configuration
+        const VAPI_PUBLIC_KEY = 'f83a3655-29a5-41ed-87f6-c9ffee3568e6';
+        const VAPI_ASSISTANT_ID = '9028e7b3-fc2c-4977-b64e-421ec04873c5';
+        
+        console.log('Using Public Key:', VAPI_PUBLIC_KEY);
+        console.log('Using Assistant ID:', VAPI_ASSISTANT_ID);
 
         // Get UI elements
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
         const statusIndicator = document.getElementById('status-indicator');
+        const sdkStatusEl = document.getElementById('sdk-status');
+        const browserInfoEl = document.getElementById('browser-info');
+
+        // Update browser info
+        browserInfoEl.textContent = navigator.userAgent.substring(0, 30) + '...';
+
+        // Check for Vapi availability
+        if (typeof Vapi === 'undefined') {
+            statusIndicator.textContent = 'Error: Vapi SDK not loaded';
+            statusIndicator.classList.add('text-red-400');
+            sdkStatusEl.textContent = 'Failed to load';
+            console.error('Vapi SDK not available');
+        } else {
+            sdkStatusEl.textContent = 'Loaded';
+            console.log('Vapi SDK successfully loaded');
+        }
 
         // Initialize Vapi
-        const vapi = new Vapi(VAPI_PUBLIC_KEY);
+        let vapi;
+        try {
+            console.log('Creating Vapi instance...');
+            if (typeof Vapi === 'undefined') {
+                throw new Error('Vapi SDK not loaded from CDN');
+            }
+            vapi = new Vapi(VAPI_PUBLIC_KEY);
+            console.log('✅ Vapi instance created successfully');
+            console.log('Vapi object:', vapi);
+        } catch (error) {
+            console.error('❌ Failed to initialize Vapi:', error);
+            console.error('Error details:', error.message, error.stack);
+            statusIndicator.textContent = 'Error: Failed to initialize Vapi';
+            statusIndicator.classList.add('text-red-400');
+            alert('Failed to initialize Vapi: ' + error.message);
+        }
 
         // Helper function to update button and status UI
         function updateUI(isCalling) {
             if (isCalling) {
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
-                startBtn.classList.add('pulse-listening'); // Add pulse
+                startBtn.classList.add('pulse-listening');
+                console.log('UI updated: Call in progress');
             } else {
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
                 statusIndicator.textContent = 'Ready';
-                startBtn.classList.remove('pulse-listening'); // Remove pulse
+                statusIndicator.classList.remove('text-red-400');
+                startBtn.classList.remove('pulse-listening');
+                console.log('UI updated: Ready state');
             }
         }
 
-        // --- 2. Define Call Functions ---
-
-        const startCall = () => {
-            console.log('Starting call...');
-            statusIndicator.textContent = 'Connecting...';
+        // Define Call Functions
+        const startCall = async () => {
+            console.log('🎙️ Start call button clicked');
             
-            // Check if Vapi is configured with keys
-            if (VAPI_PUBLIC_KEY === 'YOUR_VAPI_PUBLIC_KEY' || VAPI_ASSISTANT_ID === 'YOUR_VAPI_ASSISTANT_ID') {
-                statusIndicator.textContent = 'Error: Vapi keys not set.';
-                console.error("Vapi keys are not set in index.html. Please edit lines 77 and 78.");
+            if (!vapi) {
+                const msg = 'Error: Vapi not initialized';
+                statusIndicator.textContent = msg;
+                console.error(msg);
+                alert(msg);
                 return;
             }
 
-            // Start the call with your specific assistant
-            vapi.start(VAPI_ASSISTANT_ID);
+            if (!VAPI_PUBLIC_KEY || !VAPI_ASSISTANT_ID) {
+                const msg = 'Error: Missing API keys';
+                statusIndicator.textContent = msg;
+                console.error(msg);
+                alert(msg);
+                return;
+            }
+
+            try {
+                statusIndicator.textContent = 'Connecting...';
+                console.log('📞 Attempting to start call with assistant:', VAPI_ASSISTANT_ID);
+                console.log('Vapi.start() type:', typeof vapi.start);
+                
+                // Request microphone permission first
+                console.log('Requesting microphone permission...');
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('✅ Microphone permission granted');
+                stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+                
+                // Start the call with timeout
+                console.log('Starting Vapi call...');
+                const callPromise = vapi.start(VAPI_ASSISTANT_ID);
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Connection timeout after 15 seconds. This usually means invalid API keys or assistant ID. Please verify your Vapi credentials at vapi.ai')), 15000)
+                );
+                
+                await Promise.race([callPromise, timeoutPromise]);
+                console.log('✅ Call started successfully');
+            } catch (error) {
+                console.error('❌ Error starting call:', error);
+                console.error('Error type:', error.constructor.name);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                
+                let errorMsg = 'Failed to start call: ';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg += 'Microphone permission denied';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg += 'No microphone found';
+                } else if (error.message.includes('timeout')) {
+                    errorMsg += 'Connection timeout. Invalid API keys or assistant ID. Please check your Vapi credentials.';
+                } else {
+                    errorMsg += error.message || 'Unknown error';
+                }
+                
+                statusIndicator.textContent = errorMsg;
+                statusIndicator.classList.add('text-red-400');
+                alert(errorMsg);
+                updateUI(false);
+            }
         };
 
-        const stopCall = () => {
-            console.log('Stopping call...');
-            statusIndicator.textContent = 'Ending call...';
-            vapi.stop();
+        const stopCall = async () => {
+            console.log('Stop call button clicked');
+            
+            if (!vapi) {
+                console.error('Vapi is not initialized');
+                return;
+            }
+
+            try {
+                statusIndicator.textContent = 'Ending call...';
+                await vapi.stop();
+                console.log('Call stopped successfully');
+            } catch (error) {
+                console.error('Error stopping call:', error);
+                statusIndicator.textContent = 'Error: Failed to stop call';
+                statusIndicator.classList.add('text-red-400');
+            }
         };
 
-        // --- 3. Wire Up Event Listeners ---
-
-        // Add click listeners to buttons
+        // Wire Up Event Listeners
         startBtn.addEventListener('click', startCall);
         stopBtn.addEventListener('click', stopCall);
 
-        // --- Vapi Event Listeners ---
+        // Vapi Event Listeners
+        if (vapi) {
+            vapi.on('call-start', () => {
+                console.log('✓ Call started');
+                statusIndicator.textContent = 'Listening...';
+                updateUI(true);
+            });
 
-        vapi.on('call-start', () => {
-            console.log('Call has started.');
-            statusIndicator.textContent = 'Listening...';
-            updateUI(true);
-        });
+            vapi.on('call-end', () => {
+                console.log('✓ Call ended');
+                updateUI(false);
+            });
 
-        vapi.on('call-end', () => {
-            console.log('Call has ended.');
-            updateUI(false);
-        });
+            vapi.on('speech-start', () => {
+                console.log('📢 Assistant speaking');
+                statusIndicator.textContent = 'Assistant is speaking...';
+                startBtn.classList.remove('pulse-listening');
+            });
 
-        vapi.on('speech-start', () => {
-            console.log('Assistant is speaking...');
-            statusIndicator.textContent = 'Assistant is speaking...';
-            startBtn.classList.remove('pulse-listening'); // Stop pulse when assistant talks
-        });
+            vapi.on('speech-end', () => {
+                console.log('📢 Assistant finished speaking');
+                statusIndicator.textContent = 'Listening...';
+                startBtn.classList.add('pulse-listening');
+            });
 
-        vapi.on('speech-end', () => {
-            console.log('Assistant finished speaking.');
-            statusIndicator.textContent = 'Listening...';
-            startBtn.classList.add('pulse-listening'); // Resume pulse
-        });
+            vapi.on('error', (e) => {
+                console.error('❌ Vapi error:', e);
+                statusIndicator.textContent = `Error: ${e.message || 'Unknown error'}`;
+                statusIndicator.classList.add('text-red-400');
+                updateUI(false);
+            });
 
-        vapi.on('error', (e) => {
-            console.error('Vapi error:', e);
-            statusIndicator.textContent = 'An error occurred.';
-            updateUI(false);
-        });
+            vapi.on('message', (msg) => {
+                console.log('💬 Vapi message:', msg);
+            });
 
-        // (Optional) Log all messages for debugging
-        vapi.on('message', (msg) => {
-            console.log('Vapi Message:', msg);
-        });
+            vapi.on('volume-level', (level) => {
+                console.log('🔊 Volume level:', level);
+            });
 
-        // Set initial button state on page load
+            console.log('Vapi event listeners registered');
+        }
+
+        // Set initial button state
         updateUI(false);
-
+        console.log('Voice Agent Ready');
     </script>
 </body>
 </html>

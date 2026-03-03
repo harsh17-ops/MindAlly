@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { getToken } from 'next-auth/jwt';
 
 const apiUrl = process.env.API_URL || 'http://localhost:5000';
+const apiEndpoint = `${apiUrl}/api`;
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { documentId: string } }
 ) {
   try {
-    const headersList = headers();
-    const userId = headersList.get('x-user-id');
-    
-    if (!userId) {
+    // Get the session token
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET 
+    });
+
+    if (!token || !token.id) {
       return NextResponse.json(
-        { error: 'Unauthorized - User ID is required' },
+        { error: 'Unauthorized - Please sign in' },
         { status: 401 }
       );
     }
@@ -21,11 +25,11 @@ export async function POST(
     const { documentId } = params;
     const body = await request.json();
 
-    const response = await fetch(`${apiUrl}/pdf/${documentId}/chat`, {
+    const response = await fetch(`${apiEndpoint}/pdf/${documentId}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        'x-user-id': token.id.toString(),
       },
       body: JSON.stringify(body),
     });

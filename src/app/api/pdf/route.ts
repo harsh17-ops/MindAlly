@@ -17,14 +17,10 @@ export async function GET(req: NextRequest) {
     }
 
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
-    
-    // 🚨 Add this debug logging
-    console.log('🐛 API URL:', apiUrl);
-    console.log('🐛 Calling:', `${apiUrl}/pdf`);
-    console.log('🐛 Request URL:', req.url);
+    const apiEndpoint = `${apiUrl}/api`;
     
     try {
-      const response = await fetch(`${apiUrl}/pdf`, {
+      const response = await fetch(`${apiEndpoint}/pdf`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -88,8 +84,9 @@ export async function POST(req: NextRequest) {
     }
     
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
-    const response = await fetch(`${apiUrl}/pdf/upload`, {
+    const response = await fetch(`${apiEndpoint}/pdf/upload`, {
       method: 'POST',
       headers: {
         'X-User-Id': token.sub || '',
@@ -138,8 +135,9 @@ export async function DELETE(req: NextRequest) {
     }
 
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
-    const response = await fetch(`${apiUrl}/pdf/${id}`, {
+    const response = await fetch(`${apiEndpoint}/pdf/${id}`, {
       method: 'DELETE',
       headers: {
         'X-User-Id': token.sub || '',

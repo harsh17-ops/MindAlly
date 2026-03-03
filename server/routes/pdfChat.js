@@ -177,40 +177,104 @@ router.post('/:id/chat', async (req, res) => {
       return res.status(404).json({ error: 'PDF not found' });
     }
 
-    // Process the chat message using the PDF content
-    const pdfBuffer = base64ToBuffer(pdf.pdfData);
-    const { answer, sourcePages, sources } = await chatWithPdf(
-      pdfBuffer,
-      req.body.content,
-      pdf.chatHistory
-    );
+    if (!req.body.content || !req.body.content.trim()) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    // Check for required API keys (use GROQ_API_KEY_RAG if available, otherwise GROQ_API_KEY)
+    const groqApiKey = process.env.GROQ_API_KEY_RAG || process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
+      console.error('Neither GROQ_API_KEY_RAG nor GROQ_API_KEY is set');
+      return res.status(500).json({ error: 'AI service is not configured. Please set GROQ_API_KEY or GROQ_API_KEY_RAG in environment variables.' });
+    }
+
+    if (!process.env.HUGGINGFACE_API_KEY) {
+      console.error('HUGGINGFACE_API_KEY is not set');
+      return res.status(500).json({ error: 'AI service is not configured. Please set HUGGINGFACE_API_KEY in environment variables.' });
+    }
+
+    try {
+      // Use stored document chunks if available (much faster than reprocessing)
+      const storedChunks = pdf.documentChunks && pdf.documentChunks.length > 0 
+        ? pdf.documentChunks 
+        : null;
+      
+      // Process the chat message using the PDF content
+      const pdfBuffer = base64ToBuffer(pdf.pdfData);
+      const { answer, sourcePages, sources } = await chatWithPdf(
+        pdfBuffer,
+        req.body.content.trim(),
+        pdf.chatHistory || [],
+        storedChunks // Pass stored chunks for faster processing
+      );
 
     // Add messages to chat history
-    pdf.chatHistory.push({
+    const userMessage = {
       role: 'user',
       content: req.body.content,
       timestamp: new Date()
-    });
-
-    pdf.chatHistory.push({
+    };
+    
+    const assistantMessage = {
       role: 'assistant',
       content: answer,
       sourcePages: sourcePages,
       sources: sources,
       timestamp: new Date()
-    });
+    };
+
+    pdf.chatHistory.push(userMessage);
+    pdf.chatHistory.push(assistantMessage);
 
     await pdf.save();
 
-    res.json({ 
-      message: answer,
-      sourcePages: sourcePages,
-      sources: sources,
-      chatHistory: pdf.chatHistory
-    });
+    // Ensure messages have _id fields (MongoDB adds them automatically)
+    const formattedHistory = pdf.chatHistory.map((msg, index) => ({
+      ...msg.toObject ? msg.toObject() : msg,
+      _id: msg._id ? msg._id.toString() : `msg-${index}`
+    }));
+
+      res.json({ 
+        message: answer,
+        sourcePages: sourcePages,
+        sources: sources,
+        chatHistory: formattedHistory
+      });
+    } catch (processingError) {
+      console.error('Error processing PDF chat:', processingError);
+      console.error('Error name:', processingError.name);
+      console.error('Error message:', processingError.message);
+      console.error('Error stack:', processingError.stack);
+      
+      // Return more detailed error information
+      const errorMessage = processingError.message || 'Failed to process chat request';
+      
+      // Check for specific error types
+      if (processingError.message?.includes('API key')) {
+        return res.status(500).json({ 
+          error: 'AI service configuration error. Please check API keys.',
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        });
+      }
+      
+      if (processingError.message?.includes('timeout')) {
+        return res.status(504).json({ 
+          error: 'Request timeout. The AI service took too long to respond.',
+          details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        });
+      }
+      
+      return res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? processingError.stack : undefined
+      });
+    }
   } catch (error) {
-    console.error('Error in PDF chat:', error);
-    res.status(500).json({ error: error.message || 'Failed to process chat request' });
+    console.error('Error in PDF chat route:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to process chat request',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -231,7 +295,13 @@ router.get('/:documentId/history', async (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
     
-    res.json(doc.chatHistory || []);
+    // Ensure messages have _id fields
+    const formattedHistory = (doc.chatHistory || []).map((msg, index) => ({
+      ...msg.toObject ? msg.toObject() : msg,
+      _id: msg._id ? msg._id.toString() : `msg-${index}`
+    }));
+    
+    res.json(formattedHistory);
   } catch (error) {
     console.error('Error retrieving chat history:', error);
     res.status(500).json({ error: 'Error retrieving chat history' });

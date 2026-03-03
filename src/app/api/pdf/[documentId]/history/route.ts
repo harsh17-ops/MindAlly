@@ -21,8 +21,9 @@ export async function GET(
 
     const documentId = params.documentId;
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
-    const response = await fetch(`${apiUrl}/pdf/${documentId}/history`, {
+    const response = await fetch(`${apiEndpoint}/pdf/${documentId}/history`, {
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': token.sub || '',

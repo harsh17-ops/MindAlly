@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Card } from "@/components/ui/card";
@@ -25,7 +25,7 @@ export default function PdfListPage() {
   const { toast } = useToast();
   const { status } = useSession();
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       // Don't fetch if not authenticated
       if (status !== 'authenticated') {
@@ -63,7 +63,7 @@ export default function PdfListPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [status, toast]);
 
   // Load documents on mount and when auth status changes
   useEffect(() => {

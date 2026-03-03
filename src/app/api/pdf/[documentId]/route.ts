@@ -22,9 +22,10 @@ export async function GET(
 
     const documentId = params.documentId;
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
     // Forward the request with user ID in headers
-    const response = await fetch(`${apiUrl}/pdf/${documentId}`, {
+    const response = await fetch(`${apiEndpoint}/pdf/${documentId}`, {
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': token.sub || '', // Forward the user ID
@@ -36,17 +37,11 @@ export async function GET(
       throw new Error(data.error || 'Failed to fetch PDF');
     }
 
-    // Get the PDF data as an array buffer
-    const pdfBuffer = await response.arrayBuffer();
-
-    // Return the PDF with proper headers
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline',
-        'Content-Length': pdfBuffer.byteLength.toString(),
-      },
-    });
+    // Get the PDF data as JSON (backend returns JSON with base64 data)
+    const data = await response.json();
+    
+    // Return the JSON response directly (PdfViewer expects JSON with data field)
+    return NextResponse.json(data);
   } catch (err) {
     console.error('Error fetching PDF:', err);
     const error = err as Error;
@@ -78,9 +73,10 @@ export async function POST(
 
     const body = await req.json();
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiEndpoint = `${apiUrl}/api`;
     
     const response = await fetch(
-      `${apiUrl}/pdf/${params.documentId}/chat`,
+      `${apiEndpoint}/pdf/${params.documentId}/chat`,
       {
         method: 'POST',
         headers: {

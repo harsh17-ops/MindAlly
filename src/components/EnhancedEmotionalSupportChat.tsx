@@ -62,6 +62,7 @@ export default function EnhancedEmotionalSupportChat() {
   const { data: session } = useSession();
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const API_ENDPOINT = `${API_BASE_URL}/api`;
   const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '76626886-55e1-4f58-8806-55c42c31e0d7';
   const VAPI_ASSISTANT_ID = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || '469c96f1-4524-4ba4-94d4-04f1c2770f03';
 
@@ -79,9 +80,11 @@ export default function EnhancedEmotionalSupportChat() {
   useEffect(() => {
     const initVapi = async () => {
       try {
+        console.log('Initializing Vapi with public key:', VAPI_PUBLIC_KEY?.substring(0, 10) + '...');
         const vapiModule = await import('@vapi-ai/web');
         const Vapi = vapiModule.default as unknown as VapiConstructor;
         vapiRef.current = new Vapi(VAPI_PUBLIC_KEY);
+        console.log('Vapi client initialized successfully');
 
         // Set up Vapi event listeners
         vapiRef.current.on('call-start', () => {
@@ -114,6 +117,7 @@ export default function EnhancedEmotionalSupportChat() {
 
       } catch (error) {
         console.error('Failed to initialize Vapi:', error);
+        alert('Failed to initialize voice service. Please check console for details.');
       }
     };
 
@@ -129,7 +133,7 @@ export default function EnhancedEmotionalSupportChat() {
   useEffect(() => {
     const loadLanguages = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/emotional-support/languages`);
+        const response = await fetch(`${API_ENDPOINT}/emotional-support/languages`);
         if (response.ok) {
           const { languages } = await response.json();
           setLanguages(languages);
@@ -140,7 +144,7 @@ export default function EnhancedEmotionalSupportChat() {
     };
 
     loadLanguages();
-  }, [API_BASE_URL]);
+  }, [API_ENDPOINT]);
 
   const formatTimestamp = (date: Date) => {
     return new Date(date).toLocaleTimeString('en-US', {
@@ -151,13 +155,33 @@ export default function EnhancedEmotionalSupportChat() {
   };
 
   const startVoiceCall = async () => {
-    if (!vapiRef.current || isCallActive) return;
+    if (!vapiRef.current) {
+      console.error('Vapi client not initialized');
+      alert('Voice service not initialized. Please refresh the page.');
+      return;
+    }
+    
+    if (isCallActive) {
+      console.log('Call already active');
+      return;
+    }
 
     try {
+      console.log('Starting voice call with assistant ID:', VAPI_ASSISTANT_ID);
       setCallStatus('connecting');
-      await vapiRef.current.start(VAPI_ASSISTANT_ID);
+      
+      // Add timeout to prevent infinite hang
+      const callPromise = vapiRef.current.start(VAPI_ASSISTANT_ID);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout - Invalid Vapi credentials. Please verify your API keys and assistant ID at vapi.ai')), 15000)
+      );
+      
+      await Promise.race([callPromise, timeoutPromise]);
+      console.log('✅ Voice call started successfully');
     } catch (error) {
       console.error('Failed to start voice call:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to start voice call: ${errorMsg}\n\nPlease check your Vapi credentials in .env.local`);
       setCallStatus('idle');
     }
   };
@@ -176,9 +200,10 @@ export default function EnhancedEmotionalSupportChat() {
     e.preventDefault();
     if (!input.trim() || loading || !session?.user?.id) return;
 
+    const messageText = input.trim();
     const userMessage: Message = {
       role: 'user',
-      content: input.trim(),
+      content: messageText,
       timestamp: new Date(),
       language: selectedLanguage
     };
@@ -188,14 +213,14 @@ export default function EnhancedEmotionalSupportChat() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/emotional-support/enhanced-chat`, {
+      const response = await fetch(`${API_ENDPOINT}/emotional-support/enhanced-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': session.user.id
         },
         body: JSON.stringify({
-          message: input.trim(),
+          message: messageText,
           language: selectedLanguage
         })
       });
