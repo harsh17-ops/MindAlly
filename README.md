@@ -13,18 +13,6 @@ An intelligent study and emotional wellness platform that combines personalized 
 - [Contributing](#contributing)
 - [License](#license)
 
-## Demo
-
-### Project Walkthrough
-
-<video width="800" height="600" controls>
-  <source src="mindally.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-
-
-
-
 
 ## Overview
 
